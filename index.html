@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contador de Veículos · M.URB</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0E1116; --panel: #161B22; --panel-light: #1C232D; --border: #2A323D;
+    --text: #E6EDF3; --muted: #7D8590; --accent: #FFB000; --accent-dim: #4a3410;
+    --moto: #FF6B6B; --carro: #4ECDC4; --onibus: #FFD93D; --caminhao: #A78BFA;
+    --green: #3FB950; --blue: #58A6FF;
+  }
+  body { font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand-logo { width: 36px; height: 36px; background: var(--accent); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
+  .brand h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+  .brand span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .clock { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 5px 11px; border-radius: 6px; font-weight: 600; }
+  .setup { max-width: 480px; margin: 36px auto; padding: 0 20px; }
+  .setup-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 26px; }
+  .setup-card h2 { font-size: 20px; margin-bottom: 6px; }
+  .setup-card .sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  label.field { display: block; margin-bottom: 15px; }
+  label.field .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; font-weight: 500; }
+  input.inp { width: 100%; background: var(--panel-light); border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; color: var(--text); font-size: 14px; font-family: 'Space Grotesk', sans-serif; }
+  input.inp:focus { outline: none; border-color: var(--accent); }
+  .btn { background: var(--accent); color: #1a1200; border: none; border-radius: 8px; padding: 13px; font-size: 15px; font-weight: 600; width: 100%; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: filter 0.15s; }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: translateY(1px); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-ghost:hover { background: var(--panel-light); }
+  .btn-green { background: var(--green); color: #062611; }
+  .btn-blue { background: var(--blue); color: #04203f; }
+  .counter { display: none; padding: 0 0 200px 0; }
+  .counter.active { display: block; }
+  .gate-switch { display: flex; gap: 6px; padding: 12px 18px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .gate-btn { flex: 1; background: var(--panel-light); border: 1px solid var(--border); border-radius: 8px; padding: 9px 4px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .gate-btn:hover { border-color: var(--accent); }
+  .gate-btn.active { background: var(--accent); color: #1a1200; border-color: var(--accent); }
+  .gate-btn .gl { font-size: 16px; font-weight: 700; }
+  .gate-btn .gm { font-size: 9px; opacity: 0.7; margin-top: 1px; }
+  .gate-btn .gsaved { font-size: 8px; color: var(--green); }
+  .gate-btn.active .gsaved { color: #062611; }
+  .interval-bar { background: linear-gradient(135deg, var(--accent-dim), var(--panel)); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); }
+  .interval-display { display: flex; align-items: center; gap: 12px; }
+  .interval-display .big { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent); }
+  .interval-display .meta { font-size: 11px; color: var(--muted); }
+  .interval-display .meta b { color: var(--text); }
+  .interval-actions { display: flex; gap: 8px; }
+  .istart { background: var(--green); color: #062611; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 6px; }
+  .istart:active { transform: translateY(1px); }
+  .istart.is-pause { background: var(--accent); color: #1a1200; }
+  .interval-tabs { display: flex; gap: 6px; padding: 10px 18px; overflow-x: auto; border-bottom: 1px solid var(--border); }
+  .itab { flex-shrink: 0; background: var(--panel-light); border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; transition: all 0.15s; white-space: nowrap; }
+  .itab.active { background: var(--accent); color: #1a1200; border-color: var(--accent); font-weight: 600; }
+  .itab .done { color: var(--green); margin-left: 3px; }
+  .itab.active .done { color: #1a1200; }
+  .last-banner { margin: 14px 18px 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; }
+  .last-banner .lb-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .last-banner .lb-veh { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; }
+  .last-banner .lb-icon { font-size: 26px; }
+  .last-banner .lb-mov { font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: var(--bg); padding: 3px 10px; border-radius: 5px; color: var(--accent); margin-left: auto; }
+  .last-banner.empty .lb-veh { color: var(--muted); font-size: 14px; font-weight: 400; }
+  .movements { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 14px 18px; }
+  @media (max-width: 700px) { .movements { grid-template-columns: 1fr; } }
+  .mov-col { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .mov-head { background: var(--panel-light); padding: 11px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .mov-head .mov-name { font-size: 14px; font-weight: 600; }
+  .mov-head .mov-total { font-family: 'IBM Plex Mono', monospace; font-size: 13px; background: var(--bg); padding: 3px 9px; border-radius: 5px; color: var(--accent); }
+  .veh-row { display: flex; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--border); gap: 10px; cursor: pointer; user-select: none; }
+  .veh-row:last-child { border-bottom: none; }
+  .veh-row:hover { background: var(--panel-light); }
+  .veh-key { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px; flex-shrink: 0; border: 1px solid var(--border); background: var(--bg); text-transform: uppercase; }
+  .veh-icon { font-size: 18px; width: 24px; text-align: center; }
+  .veh-name { flex: 1; font-size: 13px; color: var(--muted); }
+  .veh-count { font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 600; min-width: 34px; text-align: right; }
+  .veh-row.moto .veh-count { color: var(--moto); }
+  .veh-row.carro .veh-count { color: var(--carro); }
+  .veh-row.onibus .veh-count { color: var(--onibus); }
+  .veh-row.caminhao .veh-count { color: var(--caminhao); }
+  .veh-row.flash { animation: flash 0.3s; }
+  @keyframes flash { 0% { background: var(--accent-dim); } 100% { background: transparent; } }
+  .veh-minus { background: var(--panel-light); border: 1px solid var(--border); color: var(--muted); width: 26px; height: 26px; border-radius: 5px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .veh-minus:hover { border-color: var(--moto); color: var(--moto); }
+  .pause-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 300; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .pause-overlay.show { display: flex; }
+  .pause-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 24px; max-width: 440px; width: 100%; }
+  .pause-card h3 { font-size: 18px; margin-bottom: 4px; }
+  .pause-card .psub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .last-recall { background: var(--panel-light); border: 1px solid var(--border); border-radius: 9px; padding: 12px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+  .last-recall .lr-icon { font-size: 28px; }
+  .last-recall .lr-text { font-size: 13px; }
+  .last-recall .lr-text b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .last-recall .lr-mov { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); }
+  .marks-list { margin: 14px 0; max-height: 160px; overflow-y: auto; }
+  .mark-item { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; margin-bottom: 7px; font-size: 12px; display: flex; gap: 10px; align-items: flex-start; }
+  .mark-item .mt { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-weight: 600; flex-shrink: 0; }
+  .mark-item .mtxt { color: var(--muted); flex: 1; }
+  .mark-item .mdel { color: var(--muted); cursor: pointer; }
+  .mark-item .mdel:hover { color: var(--moto); }
+  .bottombar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 1px solid var(--border); padding: 11px 18px; display: flex; flex-direction: column; gap: 9px; z-index: 50; }
+  .bottombar-row { display: flex; gap: 9px; align-items: stretch; }
+  .bottombar .btn { flex: 1; }
+  .btn-export-big { width: 100%; font-size: 16px; padding: 15px; font-weight: 700; }
+  .total-pill { display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--panel-light); border: 1px solid var(--border); border-radius: 8px; padding: 4px 16px; min-width: 84px; }
+  .total-pill .n { font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 700; color: var(--accent); }
+  .total-pill .l { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kbd-hint { text-align: center; font-size: 11px; color: var(--muted); padding: 8px; background: var(--panel); border-top: 1px solid var(--border); }
+  .kbd-hint kbd { font-family: 'IBM Plex Mono', monospace; background: var(--panel-light); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 10px; }
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--green); color: #0a1f0e; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; opacity: 0; transition: all 0.3s; z-index: 400; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="brand-logo">🚗</div>
+    <div><h1>Contador de Veículos</h1><span>M.URB · Contagem OD</span></div>
+  </div>
+  <div class="clock mono" id="clock">--:--:--</div>
+</header>
+
+<div class="setup" id="setupScreen">
+  <div class="setup-card">
+    <h2>Nova contagem</h2>
+    <p class="sub">Configure os dados. Depois você troca de Gate dentro do app sem perder o progresso.</p>
+    <label class="field"><span class="lbl">Local / Cruzamento</span><input class="inp" id="inpLocal" placeholder="Ex: Av. Ipiranga x Salvador França" /></label>
+    <label class="field"><span class="lbl">Data</span><input class="inp" type="date" id="inpData" /></label>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <label class="field"><span class="lbl">Início</span><input class="inp" type="time" id="inpInicio" value="17:00" /></label>
+      <label class="field"><span class="lbl">Fim</span><input class="inp" type="time" id="inpFim" value="18:00" /></label>
+    </div>
+    <button class="btn" id="btnStart">Iniciar contagem →</button>
+  </div>
+  <div class="setup-card" style="margin-top:16px;">
+    <h2 style="font-size:16px;">Exportar / Limpar</h2>
+    <p class="sub" id="savedInfo">Nenhuma sessão salva ainda.</p>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-ghost" id="btnExport" style="font-size:13px;">⬇️ Exportar planilha OD</button>
+      <button class="btn btn-ghost" id="btnClear" style="font-size:13px;">🗑️ Limpar tudo</button>
+    </div>
+  </div>
+</div>
+
+<div class="counter" id="counterScreen">
+  <div class="gate-switch" id="gateSwitch"></div>
+  <div class="interval-bar">
+    <div class="interval-display">
+      <span class="big mono" id="curInterval">17:00–17:15</span>
+      <div class="meta">Período <b id="ivPos">1</b>/<b id="ivTotal">4</b><br><span id="ivStatus">Parado</span></div>
+    </div>
+    <div class="interval-actions">
+      <button class="istart" id="btnStartInterval">▶ START</button>
+      <button class="istart is-pause" id="btnPause">⏸ Pause</button>
+    </div>
+  </div>
+  <div class="interval-tabs" id="intervalTabs"></div>
+  <div class="last-banner empty" id="lastBanner">
+    <div><div class="lb-label">Último veículo marcado</div><div class="lb-veh" id="lastVeh">Nenhum ainda — comece a contar</div></div>
+    <span class="lb-mov hide" id="lastMov"></span>
+  </div>
+  <div class="movements" id="movements"></div>
+  <div class="kbd-hint"><kbd>Q W E R</kbd> mov 1 · <kbd>A S D F</kbd> mov 2 · <kbd>Z X C V</kbd> mov 3 · <kbd>Espaço</kbd> START próximo · <kbd>Tab</kbd> volta período · <kbd>Backspace</kbd> desfaz</div>
+</div>
+
+<div class="bottombar hide" id="bottomBar">
+  <div class="bottombar-row">
+    <button class="btn btn-ghost" id="btnBack" style="flex:0 0 auto; padding-left:14px; padding-right:14px;">⚙</button>
+    <div class="total-pill"><span class="n mono" id="grandTotal">0</span><span class="l">Total Gate</span></div>
+    <button class="btn btn-green" id="btnSaveGate" style="flex:1;">✓ Salvar progresso</button>
+  </div>
+  <button class="btn btn-blue btn-export-big" id="btnExportCounter">⬇️ Baixar planilha OD</button>
+</div>
+
+<div class="pause-overlay" id="pauseOverlay">
+  <div class="pause-card">
+    <h3>⏸ Pausa marcada</h3>
+    <p class="psub">Anote onde parou no vídeo para retomar depois.</p>
+    <div class="last-recall" id="lastRecall">
+      <span class="lr-icon" id="lrIcon">—</span>
+      <div class="lr-text"><b id="lrName">Nenhum veículo ainda</b><span id="lrInterval">—</span></div>
+      <span class="lr-mov" id="lrMov"></span>
+    </div>
+    <label class="field"><span class="lbl">Tempo do vídeo onde parou</span><input class="inp" id="inpVideoTime" placeholder="Ex: 17:26 ou 00:34:12" /></label>
+    <label class="field"><span class="lbl">Observação (opcional)</span><input class="inp" id="inpObs" placeholder="Ex: último foi uma moto no mov 1" /></label>
+    <div id="marksList" class="marks-list"></div>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <button class="btn btn-ghost" id="btnPauseCancel" style="font-size:13px;">Fechar</button>
+      <button class="btn btn-blue" id="btnPauseSave" style="font-size:13px;">Salvar marca</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const GATES = { 'A':{movs:[9,1,5]}, 'B':{movs:[11,2,7]}, 'C':{movs:[12,3,8]}, 'D':{movs:[10,4,6]} };
+const VEHICLES = [
+  { id:'moto', icon:'🏍️', label:'Moto' },
+  { id:'carro', icon:'🚗', label:'Carro' },
+  { id:'onibus', icon:'🚌', label:'Ônibus' },
+  { id:'caminhao', icon:'🚚', label:'Caminhão' },
+];
+const KEYS = [ ['q','w','e','r'], ['a','s','d','f'], ['z','x','c','v'] ];
+
+let state = {
+  local:'', data:'', inicio:'17:00', fim:'18:00',
+  selectedGate:'A', intervals:[], curIntervalIdx:0,
+  data_counts:{}, lastVeh:{}, history:[], pauseMarks:{},
+};
+let savedGates = {};
+
+function genIntervals(inicio, fim) {
+  const [h1,m1]=inicio.split(':').map(Number); const [h2,m2]=fim.split(':').map(Number);
+  let start=h1*60+m1; const end=h2*60+m2; const out=[];
+  const fmt=(t)=>`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;
+  while(start<end){ out.push(`${fmt(start)}–${fmt(start+15)}`); start+=15; }
+  return out;
+}
+function initGate(g){ if(!state.data_counts[g]){ state.data_counts[g]=state.intervals.map(()=>[0,1,2].map(()=>({moto:0,carro:0,onibus:0,caminhao:0}))); state.pauseMarks[g]=[]; } }
+function curCounts(){ return state.data_counts[state.selectedGate][state.curIntervalIdx]; }
+function sumInterval(g,idx){ let s=0; state.data_counts[g][idx].forEach(mov=>VEHICLES.forEach(v=>s+=mov[v.id])); return s; }
+
+function renderGateSwitch(){
+  const sw=document.getElementById('gateSwitch'); sw.innerHTML='';
+  Object.keys(GATES).forEach(g=>{
+    const saved=savedGates[g]?'✓ salvo':'';
+    const div=document.createElement('div');
+    div.className='gate-btn'+(g===state.selectedGate?' active':'');
+    div.innerHTML=`<div class="gl">${g}</div><div class="gm">${GATES[g].movs.join('·')}</div><div class="gsaved">${saved}</div>`;
+    div.onclick=()=>switchGate(g); sw.appendChild(div);
+  });
+}
+function switchGate(g){
+  if(g===state.selectedGate) return;
+  state.selectedGate=g; initGate(g);
+  if(savedGates[g]){ state.data_counts[g]=JSON.parse(JSON.stringify(savedGates[g].counts)); state.pauseMarks[g]=JSON.parse(JSON.stringify(savedGates[g].marks||[])); state.lastVeh[g]=savedGates[g].lastVeh||null; }
+  state.curIntervalIdx=0; renderCounter(); showToast(`Gate ${g}`);
+}
+function renderIntervalTabs(){
+  const tabs=document.getElementById('intervalTabs'); tabs.innerHTML='';
+  state.intervals.forEach((iv,idx)=>{
+    const tab=document.createElement('div'); tab.className='itab'+(idx===state.curIntervalIdx?' active':'');
+    const total=sumInterval(state.selectedGate,idx);
+    tab.innerHTML=`${iv}${total>0?`<span class="done">●</span>`:''}`;
+    tab.onclick=()=>{ state.curIntervalIdx=idx; renderCounter(); };
+    tabs.appendChild(tab);
+  });
+}
+function renderCounter(){
+  const g=state.selectedGate;
+  document.getElementById('curInterval').textContent=state.intervals[state.curIntervalIdx];
+  document.getElementById('ivPos').textContent=state.curIntervalIdx+1;
+  document.getElementById('ivTotal').textContent=state.intervals.length;
+  const movsDiv=document.getElementById('movements'); movsDiv.innerHTML='';
+  const counts=curCounts();
+  GATES[g].movs.forEach((movNum,movIdx)=>{
+    const col=document.createElement('div'); col.className='mov-col';
+    let movTotal=0; VEHICLES.forEach(v=>movTotal+=counts[movIdx][v.id]);
+    let rows='';
+    VEHICLES.forEach((v,vIdx)=>{
+      const key=KEYS[movIdx][vIdx];
+      rows+=`<div class="veh-row ${v.id}" id="row-${movIdx}-${v.id}" onclick="tap(${movIdx},'${v.id}')"><span class="veh-key">${key}</span><span class="veh-icon">${v.icon}</span><span class="veh-name">${v.label}</span><span class="veh-count" id="cnt-${movIdx}-${v.id}">${counts[movIdx][v.id]}</span><button class="veh-minus" onclick="event.stopPropagation();decrement(${movIdx},'${v.id}')">−</button></div>`;
+    });
+    col.innerHTML=`<div class="mov-head"><span class="mov-name">Movimento ${movNum}</span><span class="mov-total mono" id="movtotal-${movIdx}">${movTotal}</span></div>${rows}`;
+    movsDiv.appendChild(col);
+  });
+  renderIntervalTabs(); renderGateSwitch(); updateGrandTotal(); renderLastBanner();
+}
+function renderLastBanner(){
+  const g=state.selectedGate; const lv=state.lastVeh[g];
+  const banner=document.getElementById('lastBanner');
+  const vehEl=document.getElementById('lastVeh'); const movEl=document.getElementById('lastMov');
+  if(lv){ banner.classList.remove('empty'); vehEl.innerHTML=`<span class="lb-icon">${lv.icon}</span> ${lv.label}`; movEl.textContent=`Mov ${lv.movNum} · ${lv.iv}`; movEl.classList.remove('hide'); }
+  else { banner.classList.add('empty'); vehEl.textContent='Nenhum ainda — comece a contar'; movEl.classList.add('hide'); }
+}
+function updateGrandTotal(){ let total=0; state.intervals.forEach((_,idx)=>total+=sumInterval(state.selectedGate,idx)); document.getElementById('grandTotal').textContent=total; }
+function tap(movIdx,vehId){ increment(movIdx,vehId); }
+function increment(movIdx,vehId){
+  const g=state.selectedGate; curCounts()[movIdx][vehId]++;
+  state.history.push({gate:g,iv:state.curIntervalIdx,movIdx,vehId});
+  const veh=VEHICLES.find(v=>v.id===vehId);
+  state.lastVeh[g]={icon:veh.icon,label:veh.label,movNum:GATES[g].movs[movIdx],iv:state.intervals[state.curIntervalIdx]};
+  updateCountDisplay(movIdx,vehId); flashRow(movIdx,vehId); renderLastBanner();
+}
+function decrement(movIdx,vehId){ if(curCounts()[movIdx][vehId]>0){ curCounts()[movIdx][vehId]--; updateCountDisplay(movIdx,vehId); } }
+function undo(){
+  const last=state.history.pop(); if(!last) return;
+  const counts=state.data_counts[last.gate][last.iv];
+  if(counts[last.movIdx][last.vehId]>0){ counts[last.movIdx][last.vehId]--; if(last.gate===state.selectedGate&&last.iv===state.curIntervalIdx) updateCountDisplay(last.movIdx,last.vehId); showToast('Desfeito'); }
+}
+function updateCountDisplay(movIdx,vehId){
+  const el=document.getElementById(`cnt-${movIdx}-${vehId}`); if(el) el.textContent=curCounts()[movIdx][vehId];
+  let mt=0; VEHICLES.forEach(v=>mt+=curCounts()[movIdx][v.id]);
+  const mtEl=document.getElementById(`movtotal-${movIdx}`); if(mtEl) mtEl.textContent=mt;
+  renderIntervalTabs(); updateGrandTotal();
+}
+function flashRow(movIdx,vehId){ const row=document.getElementById(`row-${movIdx}-${vehId}`); if(row){ row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); } }
+function startNextInterval(){
+  if(state.curIntervalIdx<state.intervals.length-1){ state.curIntervalIdx++; renderCounter(); document.getElementById('ivStatus').textContent='Contando'; showToast(`▶ ${state.intervals[state.curIntervalIdx]}`); }
+  else { showToast('Último período do Gate'); }
+}
+function prevInterval(){ if(state.curIntervalIdx>0){ state.curIntervalIdx--; renderCounter(); showToast(`← ${state.intervals[state.curIntervalIdx]}`); } }
+function openPause(){
+  const g=state.selectedGate; const lv=state.lastVeh[g];
+  document.getElementById('lrIcon').textContent=lv?lv.icon:'—';
+  document.getElementById('lrName').textContent=lv?lv.label:'Nenhum veículo ainda';
+  document.getElementById('lrInterval').textContent=lv?`Período ${lv.iv}`:'—';
+  document.getElementById('lrMov').textContent=lv?`Mov ${lv.movNum}`:'';
+  document.getElementById('inpVideoTime').value=''; document.getElementById('inpObs').value='';
+  renderMarks();
+  document.getElementById('pauseOverlay').classList.add('show');
+  document.getElementById('ivStatus').textContent='Pausado';
+  setTimeout(()=>document.getElementById('inpVideoTime').focus(),100);
+}
+function closePause(){ document.getElementById('pauseOverlay').classList.remove('show'); }
+function savePauseMark(){
+  const g=state.selectedGate;
+  const vt=document.getElementById('inpVideoTime').value.trim();
+  const obs=document.getElementById('inpObs').value.trim();
+  if(!vt&&!obs){ showToast('Preencha o tempo ou observação'); return; }
+  const lv=state.lastVeh[g]; if(!state.pauseMarks[g]) state.pauseMarks[g]=[];
+  state.pauseMarks[g].push({ videoTime:vt||'—', obs:obs||'', lastVeh:lv?`${lv.label} (mov ${lv.movNum})`:'nenhum', interval:state.intervals[state.curIntervalIdx] });
+  document.getElementById('inpVideoTime').value=''; document.getElementById('inpObs').value='';
+  renderMarks(); showToast('Marca salva');
+}
+function renderMarks(){
+  const g=state.selectedGate; const list=document.getElementById('marksList'); const marks=state.pauseMarks[g]||[];
+  if(marks.length===0){ list.innerHTML='<p style="font-size:12px;color:var(--muted);text-align:center;padding:8px;">Nenhuma marca ainda.</p>'; return; }
+  list.innerHTML='';
+  marks.forEach((m,i)=>{
+    const div=document.createElement('div'); div.className='mark-item';
+    div.innerHTML=`<span class="mt">${m.videoTime}</span><span class="mtxt">${m.interval} · último: ${m.lastVeh}${m.obs?`<br>"${m.obs}"`:''}</span><span class="mdel" onclick="delMark(${i})">✕</span>`;
+    list.appendChild(div);
+  });
+}
+function delMark(i){ state.pauseMarks[state.selectedGate].splice(i,1); renderMarks(); }
+document.addEventListener('keydown',(e)=>{
+  if(!document.getElementById('counterScreen').classList.contains('active')) return;
+  if(document.getElementById('pauseOverlay').classList.contains('show')) return;
+  const k=e.key.toLowerCase();
+  if(k===' '){ e.preventDefault(); startNextInterval(); return; }
+  if(k==='tab'){ e.preventDefault(); prevInterval(); return; }
+  if(k==='backspace'){ e.preventDefault(); undo(); return; }
+  if(k==='arrowright'){ e.preventDefault(); startNextInterval(); return; }
+  if(k==='arrowleft'){ e.preventDefault(); prevInterval(); return; }
+  for(let movIdx=0;movIdx<3;movIdx++){ const vIdx=KEYS[movIdx].indexOf(k); if(vIdx!==-1){ e.preventDefault(); increment(movIdx,VEHICLES[vIdx].id); return; } }
+});
+function startCounting(){
+  state.local=document.getElementById('inpLocal').value.trim();
+  state.data=document.getElementById('inpData').value;
+  state.inicio=document.getElementById('inpInicio').value;
+  state.fim=document.getElementById('inpFim').value;
+  if(!state.local){ alert('Informe o local/cruzamento.'); return; }
+  if(!state.data){ alert('Informe a data.'); return; }
+  state.intervals=genIntervals(state.inicio,state.fim);
+  if(state.intervals.length===0){ alert('Horário inválido.'); return; }
+  state.curIntervalIdx=0; state.history=[]; initGate(state.selectedGate);
+  if(savedGates[state.selectedGate]){ state.data_counts[state.selectedGate]=JSON.parse(JSON.stringify(savedGates[state.selectedGate].counts)); state.pauseMarks[state.selectedGate]=JSON.parse(JSON.stringify(savedGates[state.selectedGate].marks||[])); state.lastVeh[state.selectedGate]=savedGates[state.selectedGate].lastVeh||null; }
+  document.getElementById('setupScreen').style.display='none';
+  document.getElementById('counterScreen').classList.add('active');
+  document.getElementById('bottomBar').classList.remove('hide');
+  renderCounter();
+}
+function backToSetup(){
+  document.getElementById('setupScreen').style.display='block';
+  document.getElementById('counterScreen').classList.remove('active');
+  document.getElementById('bottomBar').classList.add('hide');
+  updateSavedInfo();
+}
+function saveGate(){
+  const g=state.selectedGate;
+  savedGates[g]={ counts:JSON.parse(JSON.stringify(state.data_counts[g])), marks:JSON.parse(JSON.stringify(state.pauseMarks[g]||[])), lastVeh:state.lastVeh[g]||null };
+  showToast(`Gate ${g} salvo!`); renderGateSwitch(); updateSavedInfo();
+}
+function updateSavedInfo(){
+  const keys=Object.keys(savedGates); const info=document.getElementById('savedInfo');
+  info.textContent=keys.length===0?'Nenhuma sessão salva ainda.':`Gates salvos: ${keys.sort().join(', ')} (${keys.length}/4)`;
+}
+function hm(iv){ // "17:00–17:15" -> ["17:00:00","17:15:00"]
+  const parts=iv.split('–');
+  return [parts[0]+':00', parts[1]+':00'];
+}
+function exportOD(){
+  // Salva automaticamente o Gate em andamento (se houver dados na memória de trabalho)
+  if (state.data_counts[state.selectedGate]) {
+    const temDados = state.intervals.some((_,idx)=>sumInterval(state.selectedGate,idx)>0);
+    if (temDados || !savedGates[state.selectedGate]) {
+      savedGates[state.selectedGate]={
+        counts: JSON.parse(JSON.stringify(state.data_counts[state.selectedGate])),
+        marks: JSON.parse(JSON.stringify(state.pauseMarks[state.selectedGate]||[])),
+        lastVeh: state.lastVeh[state.selectedGate]||null,
+      };
+    }
+  }
+  renderGateSwitch();
+  updateSavedInfo();
+
+  // Considera exportável qualquer Gate que tenha pelo menos uma contagem
+  const gatesComDados = Object.keys(savedGates).filter(g=>{
+    return savedGates[g].counts.some(iv=>iv.some(mov=>mov.moto+mov.carro+mov.onibus+mov.caminhao>0));
+  });
+  if(gatesComDados.length===0){ alert('Não há nenhuma contagem registrada ainda. Conte ao menos um veículo antes de baixar a planilha.'); return; }
+  const intervals=genIntervals(state.inicio,state.fim);
+
+  // Aba Fluxos no formato EPTC.
+  // Mapeamento: Carro->Veículo Leve, Caminhão->Veículo Médio, Ônibus->Veículo Longo, Moto->Moto
+  const header=['Tipo da Pesquisa','Local','Data','Hora Início','Hora Fim','Intervalo de Hora','Pontos','Coord. Latitude','Coord. Longitude','Núm. Movimento','Veículo Leve','Veículo Médio','Veículo Longo','Moto','Fluxo Calculado'];
+  const rows=[header];
+
+  // Ordem por movimento (1..12) seguindo a metodologia, cada movimento percorre todos os intervalos
+  const movEntries=[];
+  ['A','B','C','D'].forEach(g=>{
+    if(!savedGates[g]) return;
+    GATES[g].movs.forEach((movNum,movIdx)=>movEntries.push({g,movNum,movIdx}));
+  });
+  movEntries.sort((a,b)=>a.movNum-b.movNum);
+
+  movEntries.forEach(({g,movNum,movIdx})=>{
+    const gd=savedGates[g].counts;
+    intervals.forEach((iv,ivIdx)=>{
+      const c=gd[ivIdx][movIdx];
+      const [hi,hf]=hm(iv);
+      const leve=c.carro, medio=c.caminhao, longo=c.onibus, moto=c.moto;
+      const fluxo=leve+medio+longo+moto;
+      rows.push([
+        'Veículos', state.local, state.data, hi, hf, iv.replace('–',' - '),
+        g, '', '', movNum, leve, medio, longo, moto, fluxo
+      ]);
+    });
+  });
+
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.aoa_to_sheet(rows);
+  ws1['!cols']=[{wch:14},{wch:24},{wch:12},{wch:11},{wch:11},{wch:16},{wch:7},{wch:14},{wch:15},{wch:14},{wch:12},{wch:12},{wch:12},{wch:7},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Fluxos');
+
+  // Aba auxiliar com as marcas de pausa (se houver) — útil para conferência
+  const marcas=[['Gate','Período','Tempo Vídeo','Último Veículo','Observação']];
+  ['A','B','C','D'].forEach(g=>{ if(!savedGates[g]) return; (savedGates[g].marks||[]).forEach(mk=>{ marcas.push([g,mk.interval,mk.videoTime,mk.lastVeh,mk.obs]); }); });
+  if(marcas.length>1){ const ws3=XLSX.utils.aoa_to_sheet(marcas); ws3['!cols']=[{wch:6},{wch:14},{wch:14},{wch:24},{wch:40}]; XLSX.utils.book_append_sheet(wb,ws3,'Marcas de Pausa'); }
+
+  const safeLocal=(state.local||'contagem').replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+  XLSX.writeFile(wb,`VEI_${safeLocal}_${state.data||''} - CL.xlsx`);
+  showToast('Planilha OD exportada!');
+}
+function clearAll(){ if(confirm('Limpar todos os Gates salvos? Não pode ser desfeito.')){ savedGates={}; state.data_counts={}; state.pauseMarks={}; state.lastVeh={}; updateSavedInfo(); showToast('Tudo limpo'); } }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
+function tickClock(){ document.getElementById('clock').textContent=new Date().toLocaleTimeString('pt-BR',{hour12:false}); }
+setInterval(tickClock,1000); tickClock();
+document.getElementById('inpData').value=new Date().toISOString().split('T')[0];
+document.getElementById('btnStart').onclick=startCounting;
+document.getElementById('btnBack').onclick=backToSetup;
+document.getElementById('btnSaveGate').onclick=saveGate;
+document.getElementById('btnExport').onclick=exportOD;
+document.getElementById('btnExportCounter').onclick=exportOD;
+document.getElementById('btnClear').onclick=clearAll;
+document.getElementById('btnStartInterval').onclick=startNextInterval;
+document.getElementById('btnPause').onclick=openPause;
+document.getElementById('btnPauseCancel').onclick=closePause;
+document.getElementById('btnPauseSave').onclick=savePauseMark;
+updateSavedInfo();
+</script>
+</body>
+</html>
